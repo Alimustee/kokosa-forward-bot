@@ -62,6 +62,7 @@ const messages = {
     guest_rate_limited: "Too many messages. Please wait {seconds} seconds.",
     guest_message_blocked:
       "Message blocked.\nReason: {reason}\n\nUse /appeal to submit an appeal.\nTip: Reply to this message with /appeal to attach evidence.",
+    guest_error: "An error occurred. Please try again later.",
 
     // Appeal format
     appeal_title: "[APPEAL]\n",
@@ -127,6 +128,7 @@ const messages = {
     guest_rate_limited: "发送过于频繁，请等待 {seconds} 秒。",
     guest_message_blocked:
       "消息被拦截。\n原因: {reason}\n\n使用 /appeal 提交申诉。\n提示: 回复此消息并发送 /appeal 可附加证据。",
+    guest_error: "发生错误，请稍后重试。",
 
     // Appeal format
     appeal_title: "[申诉]\n",

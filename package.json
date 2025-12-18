@@ -16,6 +16,7 @@
   "license": "BSD-2-Clause",
   "packageManager": "pnpm@10.24.0",
   "devDependencies": {
+    "globals": "^16.5.0",
     "prettier": "3.7.4",
     "wrangler": "^4.55.0"
   }

@@ -2,7 +2,15 @@
  * kokosa-forward - Telegram Message Forwarding Bot
  * Copyright (c) 2025, 秦心桜
  * Licensed under BSD 2-Clause License
+ *
+ * @fileoverview Cloudflare KV storage functions.
+ * Manages relay records, user blocks, statistics, rate limiting,
+ * trust scores, content caching, and language preferences.
  */
+
+// ============================================
+// Relay Management
+// ============================================
 
 /**
  * Generate a unique relay ID
@@ -95,6 +103,10 @@ export async function isGuestBlocked(kv, guestId) {
   return status === "true";
 }
 
+// ============================================
+// Block Status Management
+// ============================================
+
 /**
  * Set guest block status
  * @param {KVNamespace} kv - Cloudflare KV namespace
@@ -151,6 +163,10 @@ export async function getBlockedList(kv) {
   return blocked;
 }
 
+// ============================================
+// Statistics & Counters
+// ============================================
+
 /**
  * Increment a counter
  * @param {KVNamespace} kv - Cloudflare KV namespace
@@ -202,6 +218,10 @@ export async function getStatistics(kv) {
     aiBlocks,
   };
 }
+
+// ============================================
+// Rate Limiting System
+// ============================================
 
 /**
  * Rate limit configuration

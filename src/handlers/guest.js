@@ -22,16 +22,82 @@ import {
 import { ENABLE_FILTER, AUTO_BLOCK } from "../config.js";
 import { t, buildLanguageKeyboard, getDefaultLanguage } from "../i18n.js";
 
+// ============================================
+// Helper Functions
+// ============================================
+
 /**
  * Get user's language with fallback to default
+ * @param {KVNamespace} kv - KV storage
+ * @param {string} userId - User ID
+ * @returns {Promise<string>} Language code
  */
 async function getLang(kv, userId) {
   return (await getUserLanguage(kv, userId)) || getDefaultLanguage();
 }
 
 /**
- * Build appeal action keyboard for admin
- * @param {string} guestId - Guest chat ID
+ * Send message to guest with consistent error handling
+ * @param {Object} telegram - Telegram client
+ * @param {string} chatId - Chat ID
+ * @param {string} text - Message text
+ * @param {Object} options - Additional options
+ * @returns {Promise<Object>} Telegram response
+ */
+async function sendToGuest(telegram, chatId, text, options = {}) {
+  return telegram.sendMessage({ chat_id: chatId, text, ...options });
+}
+
+/**
+ * Get file URL from Telegram (unified handler for images/stickers)
+ * @param {Object} telegram - Telegram client
+ * @param {string} fileId - File ID
+ * @param {string} logPrefix - Log prefix for errors
+ * @returns {Promise<string|null>} File URL or null
+ */
+async function getFileUrl(telegram, fileId, logPrefix = "File") {
+  const fileResult = await telegram.getFile({ file_id: fileId });
+  if (!fileResult.ok) {
+    console.log(`[Guest] Failed to get ${logPrefix}:`, fileResult);
+    return null;
+  }
+  return telegram.getFileUrl(fileResult.result.file_path);
+}
+
+/**
+ * Get image URL from message
+ * @param {Object} message - Telegram message
+ * @param {Object} telegram - Telegram client
+ * @returns {Promise<string|null>} Image URL or null
+ */
+async function getImageUrl(message, telegram) {
+  if (!message.photo?.length) return null;
+  const photo = message.photo[message.photo.length - 1];
+  return getFileUrl(telegram, photo.file_id, "photo");
+}
+
+/**
+ * Get sticker URL from message (static stickers only)
+ * @param {Object} message - Telegram message
+ * @param {Object} telegram - Telegram client
+ * @returns {Promise<string|null>} Sticker URL or null
+ */
+async function getStickerUrl(message, telegram) {
+  const sticker = message.sticker;
+  if (!sticker) return null;
+
+  // Skip animated/video stickers
+  if (sticker.is_animated || sticker.is_video) {
+    console.log("[Guest] Skipping animated/video sticker");
+    return null;
+  }
+
+  return getFileUrl(telegram, sticker.file_id, "sticker");
+}
+
+/**
+ * Build appeal action keyboard
+ * @param {string} guestId - Guest ID
  * @param {string} lang - Language code
  * @returns {Object} Inline keyboard markup
  */
@@ -52,10 +118,30 @@ function buildAppealKeyboard(guestId, lang) {
   };
 }
 
+// ============================================
+// Command Handlers
+// ============================================
+
 /**
- * Handle /appeal command from blocked users
+ * Handle /lang command
  */
-async function handleAppeal(message, telegram, kv, env) {
+async function handleLangCommand(telegram, guestId, lang) {
+  return sendToGuest(telegram, guestId, t("lang_select_prompt", {}, lang), {
+    reply_markup: buildLanguageKeyboard(guestId),
+  });
+}
+
+/**
+ * Handle /start command
+ */
+async function handleStartCommand(telegram, guestId, lang) {
+  return sendToGuest(telegram, guestId, t("guest_welcome", {}, lang));
+}
+
+/**
+ * Handle /appeal command
+ */
+async function handleAppealCommand(message, telegram, kv, env) {
   const { ENV_ADMIN_UID } = env;
   const guestId = message.chat.id.toString();
   const username =
@@ -70,29 +156,26 @@ async function handleAppeal(message, telegram, kv, env) {
     ? new Date(blockInfo.blockedAt).toLocaleString()
     : "Unknown";
 
-  // Build appeal message for admin (use admin's language)
+  // Build appeal message
   let appealText = t("appeal_title", {}, adminLang);
   appealText += t("appeal_from", { username, guestId }, adminLang);
   appealText += t("appeal_blocked", { date: blockDate }, adminLang);
   appealText += t("appeal_reason", { reason: blockReason }, adminLang);
   appealText += t("appeal_separator", {}, adminLang);
 
-  // Check if there's attached text/content
   const appealContent = message.text?.replace("/appeal", "").trim();
-  if (appealContent) {
-    appealText += t("appeal_message", { content: appealContent }, adminLang);
-  } else {
-    appealText += t("appeal_no_message", {}, adminLang);
-  }
+  appealText += appealContent
+    ? t("appeal_message", { content: appealContent }, adminLang)
+    : t("appeal_no_message", {}, adminLang);
 
-  // Send appeal to admin with action buttons
+  // Send to admin
   await telegram.sendMessage({
     chat_id: ENV_ADMIN_UID,
     text: appealText,
     reply_markup: buildAppealKeyboard(guestId, adminLang),
   });
 
-  // If user replied to their own message with /appeal, forward that too
+  // Forward attached message if present
   if (message.reply_to_message) {
     await telegram.forwardMessage({
       chat_id: ENV_ADMIN_UID,
@@ -101,202 +184,187 @@ async function handleAppeal(message, telegram, kv, env) {
     });
   }
 
-  return telegram.sendMessage({
-    chat_id: guestId,
-    text: t("guest_appeal_submitted", {}, guestLang),
-  });
+  return sendToGuest(
+    telegram,
+    guestId,
+    t("guest_appeal_submitted", {}, guestLang),
+  );
+}
+
+// ============================================
+// Content Moderation
+// ============================================
+
+/**
+ * Check message content against AI filters
+ * @param {Object} message - Telegram message
+ * @param {Object} telegram - Telegram client
+ * @param {KVNamespace} kv - KV storage
+ * @param {Array} apiKeys - Gemini API keys
+ * @returns {Promise<string|null>} Filter result or null if safe
+ */
+async function checkMessageContent(message, telegram, kv, apiKeys) {
+  // Check text content (with caching)
+  const textContent = message.text || message.caption;
+  if (textContent) {
+    const cached = await getCachedModerationResult(kv, textContent);
+    if (cached.hit) {
+      console.log("[Guest] Cache hit for text content");
+      return cached.result;
+    }
+
+    const result = await checkContentSafety(textContent, apiKeys);
+    await cacheModerationResult(kv, textContent, result);
+    if (result) return result;
+  }
+
+  // Check image content
+  if (message.photo) {
+    const imageUrl = await getImageUrl(message, telegram);
+    if (imageUrl) {
+      const result = await checkImageSafety(imageUrl, apiKeys, message.caption);
+      if (result) return result;
+    }
+  }
+
+  // Check sticker content
+  if (message.sticker) {
+    const stickerUrl = await getStickerUrl(message, telegram);
+    if (stickerUrl) {
+      const result = await checkImageSafety(stickerUrl, apiKeys);
+      if (result) return result;
+    }
+  }
+
+  return null;
 }
 
 /**
- * Get image URL from message
+ * Handle unsafe content detection
+ * @param {Object} telegram - Telegram client
+ * @param {KVNamespace} kv - KV storage
+ * @param {string} guestId - Guest ID
+ * @param {string} filterResult - Filter result
+ * @param {string} lang - Language code
  */
-async function getImageUrl(message, telegram) {
-  if (!message.photo || message.photo.length === 0) {
-    return null;
+async function handleUnsafeContent(telegram, kv, guestId, filterResult, lang) {
+  await incrementCounter(kv, "ai-blocks");
+
+  if (AUTO_BLOCK) {
+    await setGuestBlocked(kv, guestId, true, `AI Filter: ${filterResult}`);
   }
 
-  // Get the largest photo (last in array)
-  const photo = message.photo[message.photo.length - 1];
-  const fileResult = await telegram.getFile({ file_id: photo.file_id });
-
-  if (!fileResult.ok) {
-    console.log("[Guest] Failed to get file:", fileResult);
-    return null;
-  }
-
-  return telegram.getFileUrl(fileResult.result.file_path);
+  return sendToGuest(
+    telegram,
+    guestId,
+    t("guest_message_blocked", { reason: filterResult }, lang),
+  );
 }
 
-/**
- * Get sticker URL from message
- */
-async function getStickerUrl(message, telegram) {
-  if (!message.sticker) {
-    return null;
-  }
-
-  // Animated stickers (tgs format) and video stickers can't be easily analyzed
-  if (message.sticker.is_animated || message.sticker.is_video) {
-    console.log("[Guest] Skipping animated/video sticker");
-    return null;
-  }
-
-  const fileResult = await telegram.getFile({
-    file_id: message.sticker.file_id,
-  });
-
-  if (!fileResult.ok) {
-    console.log("[Guest] Failed to get sticker file:", fileResult);
-    return null;
-  }
-
-  return telegram.getFileUrl(fileResult.result.file_path);
-}
+// ============================================
+// Main Handler
+// ============================================
 
 /**
  * Handle guest messages
+ * Flow: Check blocks -> Commands -> Rate limit -> AI filter -> Forward
+ *
  * @param {Object} message - Telegram message object
  * @param {Object} telegram - Telegram client
  * @param {KVNamespace} kv - KV storage
  * @param {Object} env - Environment variables
  */
 export async function handleGuestMessage(message, telegram, kv, env) {
-  const { ENV_ADMIN_UID, ENV_GEMINI_API_KEY } = env;
-  const guestId = message.chat.id.toString();
-  const lang = await getLang(kv, guestId);
+  try {
+    const { ENV_ADMIN_UID, ENV_GEMINI_API_KEY } = env;
+    const guestId = message.chat.id.toString();
+    const lang = await getLang(kv, guestId);
+    const text = message.text || "";
 
-  // Check block status
-  const blocked = await isGuestBlocked(kv, guestId);
+    // Check block status first
+    const blocked = await isGuestBlocked(kv, guestId);
 
-  // Handle /lang command (always allowed, even if blocked)
-  if (message.text === "/lang") {
-    return telegram.sendMessage({
-      chat_id: message.chat.id,
-      text: t("lang_select_prompt", {}, lang),
-      reply_markup: buildLanguageKeyboard(guestId),
-    });
-  }
-
-  // Handle /appeal for blocked users
-  if (message.text?.startsWith("/appeal")) {
-    if (!blocked) {
-      return telegram.sendMessage({
-        chat_id: message.chat.id,
-        text: t("guest_not_blocked", {}, lang),
-      });
+    // /lang is always allowed
+    if (text === "/lang") {
+      return handleLangCommand(telegram, guestId, lang);
     }
-    return handleAppeal(message, telegram, kv, env);
-  }
 
-  // Block message if user is blocked
-  if (blocked) {
-    return telegram.sendMessage({
-      chat_id: message.chat.id,
-      text: t("guest_blocked", {}, lang),
-    });
-  }
-
-  // Welcome message for /start
-  if (message.text === "/start") {
-    return telegram.sendMessage({
-      chat_id: message.chat.id,
-      text: t("guest_welcome", {}, lang),
-    });
-  }
-
-  // Rate limiting
-  const rateLimit = await checkRateLimit(kv, guestId);
-  if (!rateLimit.allowed) {
-    console.log(`[Guest] Rate limited: ${guestId}`);
-    return telegram.sendMessage({
-      chat_id: message.chat.id,
-      text: t("guest_rate_limited", { seconds: rateLimit.resetIn }, lang),
-    });
-  }
-
-  // AI content filter
-  if (ENABLE_FILTER && ENV_GEMINI_API_KEY) {
-    // Skip AI check for trusted users
-    const trusted = await isUserTrusted(kv, guestId);
-    if (trusted) {
-      console.log(`[Guest] Trusted user, skipping AI check: ${guestId}`);
-    } else {
-      const apiKeys = parseApiKeys(ENV_GEMINI_API_KEY);
-      let filterResult = null;
-      let contentToCache = null;
-
-      // Check text content
-      const textContent = message.text || message.caption;
-      if (textContent) {
-        contentToCache = textContent;
-
-        // Check cache first
-        const cached = await getCachedModerationResult(kv, textContent);
-        if (cached.hit) {
-          console.log(`[Guest] Cache hit for text content`);
-          filterResult = cached.result;
-        } else {
-          // Call AI API
-          filterResult = await checkContentSafety(textContent, apiKeys);
-          // Cache the result
-          await cacheModerationResult(kv, textContent, filterResult);
-        }
+    // /appeal for blocked users
+    if (text.startsWith("/appeal")) {
+      if (!blocked) {
+        return sendToGuest(telegram, guestId, t("guest_not_blocked", {}, lang));
       }
-
-      // Check image content if present (not cached - unique per image)
-      if (!filterResult && message.photo) {
-        const imageUrl = await getImageUrl(message, telegram);
-        if (imageUrl) {
-          filterResult = await checkImageSafety(
-            imageUrl,
-            apiKeys,
-            message.caption,
-          );
-        }
-      }
-
-      // Check sticker content if present
-      if (!filterResult && message.sticker) {
-        const stickerUrl = await getStickerUrl(message, telegram);
-        if (stickerUrl) {
-          filterResult = await checkImageSafety(stickerUrl, apiKeys);
-        }
-      }
-
-      // Handle unsafe content
-      if (filterResult) {
-        await incrementCounter(kv, "ai-blocks");
-        if (AUTO_BLOCK) {
-          await setGuestBlocked(
-            kv,
-            guestId,
-            true,
-            `AI Filter: ${filterResult}`,
-          );
-        }
-        return telegram.sendMessage({
-          chat_id: message.chat.id,
-          text: t("guest_message_blocked", { reason: filterResult }, lang),
-        });
-      }
-
-      // Passed moderation - increment trust score
-      await incrementTrustScore(kv, guestId);
+      return handleAppealCommand(message, telegram, kv, env);
     }
-  }
 
-  // Create relay for tracking
-  const relay = await createRelay(kv, guestId, message);
+    // Blocked users cannot proceed further
+    if (blocked) {
+      return sendToGuest(telegram, guestId, t("guest_blocked", {}, lang));
+    }
 
-  // Forward message to admin
-  const fwd = await telegram.forwardMessage({
-    chat_id: ENV_ADMIN_UID,
-    from_chat_id: message.chat.id,
-    message_id: message.message_id,
-  });
+    // /start command
+    if (text === "/start") {
+      return handleStartCommand(telegram, guestId, lang);
+    }
 
-  // Link forwarded message to relay
-  if (fwd.ok) {
-    await linkAdminMessage(kv, fwd.result.message_id, relay.id);
+    // Rate limiting check
+    const rateLimit = await checkRateLimit(kv, guestId);
+    if (!rateLimit.allowed) {
+      console.log(`[Guest] Rate limited: ${guestId}`);
+      return sendToGuest(
+        telegram,
+        guestId,
+        t("guest_rate_limited", { seconds: rateLimit.resetIn }, lang),
+      );
+    }
+
+    // AI content filter (skip for trusted users)
+    if (ENABLE_FILTER && ENV_GEMINI_API_KEY) {
+      const trusted = await isUserTrusted(kv, guestId);
+
+      if (trusted) {
+        console.log(`[Guest] Trusted user, skipping AI check: ${guestId}`);
+      } else {
+        const apiKeys = parseApiKeys(ENV_GEMINI_API_KEY);
+        const filterResult = await checkMessageContent(
+          message,
+          telegram,
+          kv,
+          apiKeys,
+        );
+
+        if (filterResult) {
+          return handleUnsafeContent(telegram, kv, guestId, filterResult, lang);
+        }
+
+        // Passed moderation - increment trust score
+        await incrementTrustScore(kv, guestId);
+      }
+    }
+
+    // Create relay and forward message
+    const relay = await createRelay(kv, guestId, message);
+    const fwd = await telegram.forwardMessage({
+      chat_id: ENV_ADMIN_UID,
+      from_chat_id: message.chat.id,
+      message_id: message.message_id,
+    });
+
+    if (fwd.ok) {
+      await linkAdminMessage(kv, fwd.result.message_id, relay.id);
+    }
+  } catch (error) {
+    console.error(
+      `[Guest] Handler error for ${message.chat?.id}: ${error.message}`,
+      error.stack,
+    );
+
+    // Try to send generic error message
+    try {
+      const lang = await getLang(kv, message.chat.id.toString());
+      await sendToGuest(telegram, message.chat.id, t("guest_error", {}, lang));
+    } catch {
+      // Ignore secondary errors
+    }
   }
 }
