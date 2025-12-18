@@ -78,12 +78,26 @@ async function handleCallbackUpdate(update, telegram, kv, env) {
 
 /**
  * Handle edited message updates.
- * Currently logs only - could be extended to re-check content.
+ * Forwards edited messages to admin with warning for security monitoring.
  */
 async function handleEditedMessage(update, telegram, kv, env) {
   const message = update.edited_message;
-  console.log(`[Edit] Message ${message.message_id} was edited`);
-  // TODO: Implement edited message handling if needed
+  const chatId = message.chat.id.toString();
+  const { ENV_ADMIN_UID } = env;
+
+  console.log(`[Edit] Message ${message.message_id} was edited by ${chatId}`);
+
+  // Only monitor guest edited messages, not admin's own edits
+  if (chatId !== ENV_ADMIN_UID) {
+    const editWarning = `[EDITED MESSAGE]
+From: ${message.from?.username || message.from?.first_name || "Unknown"} (${chatId})
+Content: ${(message.text || message.caption || "[Media]").substring(0, 200)}`;
+
+    await telegram.sendMessage({
+      chat_id: ENV_ADMIN_UID,
+      text: editWarning,
+    });
+  }
 }
 
 /**

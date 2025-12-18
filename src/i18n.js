@@ -8,6 +8,7 @@
  */
 
 import { LANGUAGE } from "./config.js";
+import { getUserLanguage } from "./storage.js";
 
 /**
  * Language definitions.
@@ -50,6 +51,7 @@ const messages = {
     trustid_usage: "Usage: /trustid <UID>",
     trustid_success: "Trusted: {guestId}\nThis user will skip AI moderation.",
     checktext_usage: "Usage: /checktext <content>",
+    invalid_user_id: "Invalid user ID format. ID must be a number.",
 
     // Guest messages
     guest_welcome: "Hello. You can contact me via this bot.",
@@ -117,6 +119,7 @@ const messages = {
     trustid_usage: "用法: /trustid <用户ID>",
     trustid_success: "已信任: {guestId}\n该用户将跳过AI审核。",
     checktext_usage: "用法: /checktext <内容>",
+    invalid_user_id: "用户ID格式无效，ID必须为数字。",
 
     // Guest messages
     guest_welcome: "你好，你可以通过这个机器人联系我。",
@@ -217,4 +220,24 @@ export function t(key, vars = {}, lang = null) {
  */
 export function getDefaultLanguage() {
   return defaultLanguage;
+}
+
+/**
+ * Get user's language preference with fallback to default.
+ * Shared utility to eliminate duplicate getLang helpers.
+ * @param {KVNamespace} kv - Cloudflare KV namespace
+ * @param {string} userId - User ID
+ * @returns {Promise<string>} Language code
+ */
+export async function getUserLangOrDefault(kv, userId) {
+  return (await getUserLanguage(kv, userId)) || defaultLanguage;
+}
+
+/**
+ * Validate if a string is a valid Telegram user ID.
+ * @param {string} id - ID to validate
+ * @returns {boolean} True if valid
+ */
+export function isValidUserId(id) {
+  return id && /^\d+$/.test(id);
 }

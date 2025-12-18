@@ -20,18 +20,16 @@ import {
   getUserLanguage,
   setUserLanguage,
 } from "../storage.js";
-import { t, buildLanguageKeyboard, getDefaultLanguage } from "../i18n.js";
+import {
+  t,
+  buildLanguageKeyboard,
+  getUserLangOrDefault,
+  isValidUserId,
+} from "../i18n.js";
 
 // ============================================
 // Helper Functions
 // ============================================
-
-/**
- * Get user's language preference with fallback to default.
- */
-async function getLang(kv, userId) {
-  return (await getUserLanguage(kv, userId)) || getDefaultLanguage();
-}
 
 /**
  * Send a message to admin with consistent error handling.
@@ -167,6 +165,13 @@ async function handleUnbanCommand(ctx, text) {
       t("unban_usage", {}, ctx.lang),
     );
   }
+  if (!isValidUserId(guestId)) {
+    return sendToAdmin(
+      ctx.telegram,
+      ctx.adminId,
+      t("invalid_user_id", {}, ctx.lang),
+    );
+  }
   await setGuestBlocked(ctx.kv, guestId, false);
   return sendToAdmin(
     ctx.telegram,
@@ -182,6 +187,13 @@ async function handleTrustIdCommand(ctx, text) {
       ctx.telegram,
       ctx.adminId,
       t("trustid_usage", {}, ctx.lang),
+    );
+  }
+  if (!isValidUserId(guestId)) {
+    return sendToAdmin(
+      ctx.telegram,
+      ctx.adminId,
+      t("invalid_user_id", {}, ctx.lang),
     );
   }
   await setUserTrusted(ctx.kv, guestId);
@@ -322,12 +334,12 @@ export async function handleCallbackQuery(query, telegram, kv, env) {
       });
     }
 
-    const lang = await getLang(kv, callerId);
+    const lang = await getUserLangOrDefault(kv, callerId);
 
     // Appeal actions
     if (action === "appeal") {
       const [decision, guestId] = params;
-      const guestLang = await getLang(kv, guestId);
+      const guestLang = await getUserLangOrDefault(kv, guestId);
 
       if (decision === "accept") {
         await setGuestBlocked(kv, guestId, false);
@@ -383,7 +395,7 @@ export async function handleAdminMessage(message, telegram, kv, env) {
     const { ENV_ADMIN_UID } = env;
     const text = message.text || "";
     const userId = message.from.id.toString();
-    const lang = await getLang(kv, userId);
+    const lang = await getUserLangOrDefault(kv, userId);
 
     const ctx = { telegram, kv, adminId: ENV_ADMIN_UID, userId, lang };
 

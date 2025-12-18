@@ -23,18 +23,11 @@ import {
   getUserLanguage,
 } from "../storage.js";
 import { ENABLE_FILTER, AUTO_BLOCK } from "../config.js";
-import { t, buildLanguageKeyboard, getDefaultLanguage } from "../i18n.js";
+import { t, buildLanguageKeyboard, getUserLangOrDefault } from "../i18n.js";
 
 // ============================================
 // Helper Functions
 // ============================================
-
-/**
- * Get user's language with fallback to default.
- */
-async function getLang(kv, userId) {
-  return (await getUserLanguage(kv, userId)) || getDefaultLanguage();
-}
 
 /**
  * Send message to guest with consistent error handling.
@@ -122,8 +115,8 @@ async function handleAppealCommand(message, telegram, kv, env) {
   const guestId = message.chat.id.toString();
   const username =
     message.from?.username || message.from?.first_name || "Unknown";
-  const guestLang = await getLang(kv, guestId);
-  const adminLang = await getLang(kv, ENV_ADMIN_UID);
+  const guestLang = await getUserLangOrDefault(kv, guestId);
+  const adminLang = await getUserLangOrDefault(kv, ENV_ADMIN_UID);
 
   const blockInfo = await getBlockInfo(kv, guestId);
   const blockReason = blockInfo?.reason || "Unknown";
@@ -235,7 +228,7 @@ export async function handleGuestMessage(message, telegram, kv, env) {
   try {
     const { ENV_ADMIN_UID, ENV_GEMINI_API_KEY } = env;
     const guestId = message.chat.id.toString();
-    const lang = await getLang(kv, guestId);
+    const lang = await getUserLangOrDefault(kv, guestId);
     const text = message.text || "";
 
     const blocked = await isGuestBlocked(kv, guestId);
@@ -317,7 +310,7 @@ export async function handleGuestMessage(message, telegram, kv, env) {
 
     // Try to send generic error message
     try {
-      const lang = await getLang(kv, message.chat.id.toString());
+      const lang = await getUserLangOrDefault(kv, message.chat.id.toString());
       await sendToGuest(telegram, message.chat.id, t("guest_error", {}, lang));
     } catch {
       // Ignore secondary errors

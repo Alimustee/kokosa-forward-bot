@@ -8,6 +8,12 @@
  * trust scores, content caching, and language preferences.
  */
 
+import {
+  RATE_LIMIT_MAX_REQUESTS,
+  RATE_LIMIT_WINDOW_MS,
+  TRUST_THRESHOLD,
+} from "./config.js";
+
 // ============================================
 // Relay Management
 // ============================================
@@ -208,11 +214,6 @@ export async function getStatistics(kv) {
 // Rate Limiting System
 // ============================================
 
-const RATE_LIMIT_CONFIG = {
-  maxRequests: 10, // Maximum requests per window
-  windowMs: 60000, // Time window in milliseconds (1 minute)
-};
-
 /**
  * Check if user is rate limited.
  * @param {KVNamespace} kv - Cloudflare KV namespace
@@ -224,18 +225,18 @@ export async function checkRateLimit(kv, guestId) {
   const now = Date.now();
   const data = await kv.get(key, { type: "json" });
 
-  if (!data || now - data.windowStart > RATE_LIMIT_CONFIG.windowMs) {
+  if (!data || now - data.windowStart > RATE_LIMIT_WINDOW_MS) {
     // New window
     await kv.put(key, JSON.stringify({ windowStart: now, count: 1 }), {
       expirationTtl: 120,
     });
-    return { allowed: true, remaining: RATE_LIMIT_CONFIG.maxRequests - 1 };
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1 };
   }
 
-  if (data.count >= RATE_LIMIT_CONFIG.maxRequests) {
+  if (data.count >= RATE_LIMIT_MAX_REQUESTS) {
     // Rate limited
     const resetIn = Math.ceil(
-      (data.windowStart + RATE_LIMIT_CONFIG.windowMs - now) / 1000,
+      (data.windowStart + RATE_LIMIT_WINDOW_MS - now) / 1000,
     );
     return { allowed: false, remaining: 0, resetIn };
   }
@@ -249,7 +250,7 @@ export async function checkRateLimit(kv, guestId) {
 
   return {
     allowed: true,
-    remaining: RATE_LIMIT_CONFIG.maxRequests - data.count - 1,
+    remaining: RATE_LIMIT_MAX_REQUESTS - data.count - 1,
   };
 }
 
@@ -258,14 +259,15 @@ export async function checkRateLimit(kv, guestId) {
  * @returns {Object} Rate limit config
  */
 export function getRateLimitConfig() {
-  return { ...RATE_LIMIT_CONFIG };
+  return {
+    maxRequests: RATE_LIMIT_MAX_REQUESTS,
+    windowMs: RATE_LIMIT_WINDOW_MS,
+  };
 }
 
 // ============================================
 // Trust Whitelist System
 // ============================================
-
-const TRUST_THRESHOLD = 3; // Messages needed to become trusted
 
 /**
  * Get user trust score.
